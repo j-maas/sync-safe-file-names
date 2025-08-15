@@ -1,17 +1,17 @@
-import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from 'obsidian';
+import { App, Editor, EventRef, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from 'obsidian';
 import { failure, Result, success } from 'src/result';
-import { getSafeName } from 'src/safe-name';
-
-// Remember to rename these classes and interfaces!
+import { baseCharacters, getSafeName } from 'src/safe-name';
 
 interface SyncSafeSettings {
 	renameAutomatically: boolean;
 	addOriginalAlias: boolean;
+	additionalCharacters: string;
 }
 
 const DEFAULT_SETTINGS: SyncSafeSettings = {
 	renameAutomatically: true,
 	addOriginalAlias: true,
+	additionalCharacters: "&+'\"(),$€ÄäÖöÜüßÀàÉéÈèÇçÂâÊêËëÏïÎîÔôŒœÆæ",
 }
 
 export default class SyncSafePlugin extends Plugin {
@@ -223,7 +223,7 @@ export default class SyncSafePlugin extends Plugin {
 
 	getSafeNameFromFile(file: TAbstractFile): string {
 		const previousName = file.name;
-		return getSafeName(previousName);
+		return getSafeName(previousName, this.settings.additionalCharacters);
 	}
 
 	getSafePath(file: TAbstractFile, safeName: string): string[] {
@@ -293,6 +293,17 @@ class SyncSafeSettingTab extends PluginSettingTab {
 				.setValue(this.plugin.settings.addOriginalAlias)
 				.onChange(async (value) => {
 					this.plugin.settings.addOriginalAlias = value;
+					await this.plugin.saveSettings();
+				})
+			)
+
+		new Setting(containerEl)
+			.setName('Allowed special characters')
+			.setDesc(`Specify characters that should be allowed in addition to the basics.\nAlways allowed are roman letters, numbers, hyphen, dot, underline and space (/[${baseCharacters}]/).`)
+			.addTextArea(text => text
+				.setValue(this.plugin.settings.additionalCharacters)
+				.onChange(async (value) => {
+					this.plugin.settings.additionalCharacters = value;
 					await this.plugin.saveSettings();
 				})
 			)

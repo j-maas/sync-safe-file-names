@@ -4,7 +4,7 @@ import { getSafeName } from "./safe-name";
 
 describe("getSafeName", () => {
     test("returns safe name unchanged", () => {
-        const input = "This is a (valid) filename.md";
+        const input = "This is a valid filename.md";
         const result = getSafeName(input);
         expect(result).toBe(input)
     });
@@ -19,5 +19,11 @@ describe("getSafeName", () => {
         const input = " There is whitespace.md"
         const result = getSafeName(input)
         expect(result).toBe("There is whitespace.md")
+    })
+
+    test("allows additional characters", () => {
+        const input = "Fancy (exotic) Ž?.md"
+        const result = getSafeName(input, "(Ž")
+        expect(result).toBe("Fancy (exotic- Ž-.md")
     })
 });
