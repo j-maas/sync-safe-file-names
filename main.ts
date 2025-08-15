@@ -16,6 +16,7 @@ const DEFAULT_SETTINGS: SyncSafeSettings = {
 
 export default class SyncSafePlugin extends Plugin {
 	settings: SyncSafeSettings;
+	automaticRenameCallbacks: EventRef[];
 
 	async onload() {
 		await this.loadSettings();
@@ -43,10 +44,8 @@ export default class SyncSafePlugin extends Plugin {
 				if (checking) {
 					return view.file !== null;
 				} else if (view.file !== null) {
-					console.debug("Renaming current file.")
 					this.renameSingleFile(view.file).then(result => {
 						if (result.success) {
-							console.debug(result.data)
 							if (result.data.alreadySafe) {
 								new Notice(`File name was already sync-safe.`)
 							} else {
@@ -74,21 +73,20 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	registerAutomaticRenaming() {
-		console.debug("Activating automatic renaming.")
-
-		this.registerEvent(this.app.vault.on('rename', this.onRename, this));
-
 		// Obsidian fires the `create` event for every file on startup. Therefore, we should only register after the layout is ready, according to https://docs.obsidian.md/Plugins/Guides/Optimizing+plugin+load+time#Option+B.+Register+the+handler+once+the+layout+is+ready.
 		this.app.workspace.onLayoutReady(() => {
-			this.registerEvent(this.app.vault.on('create', this.onCreate, this));
+			const callbacks = [
+				this.app.vault.on('create', this.onCreate, this),
+				this.app.vault.on('rename', this.onRename, this),
+			]
+			callbacks.forEach(callback => this.registerEvent(callback))
+			this.automaticRenameCallbacks = callbacks;
 		});
 	}
 
 	unregisterAutomaticRenaming() {
-		console.debug("Deactivating automatic renaming.")
-
-		this.app.vault.off('rename', this.onRename)
-		this.app.vault.off('create', this.onCreate)
+		this.automaticRenameCallbacks.forEach(callback => this.app.vault.offref(callback))
+		this.automaticRenameCallbacks = []
 	}
 
 	onunload() {
@@ -100,9 +98,9 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	async saveSettings() {
-		if (this.settings.renameAutomatically) {
+		if (this.settings.renameAutomatically && this.automaticRenameCallbacks.length === 0) {
 			this.registerAutomaticRenaming();
-		} else {
+		} else if (!this.settings.renameAutomatically && this.automaticRenameCallbacks.length > 0) {
 			this.unregisterAutomaticRenaming();
 		}
 
