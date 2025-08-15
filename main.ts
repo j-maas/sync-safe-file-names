@@ -137,11 +137,27 @@ export default class SyncSafePlugin extends Plugin {
 
 	async generateReport(editor: Editor) {
 		const filesToRename = await this.getFilesToRename()
-		filesToRename.sort((left, right) => left.file.path.localeCompare(right.file.path))
 
-		const tableHeading = "| Current name | Safe name | Current path |\n|---|---|---|"
-		const tableRows = filesToRename.map(entry => {
-			return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} |`
+		if (filesToRename.length === 0) {
+			editor.replaceRange("All files are already sync-safe.", editor.getCursor())
+			return
+		}
+
+		filesToRename.sort((left, right) => left.file.path.localeCompare(right.file.path))
+		const checkedFiles = filesToRename.map(entry => {
+			const newPath = this.getSafePath(entry.file, entry.safeName)
+			const newFile = this.app.vault.getAbstractFileByPath(newPath.join("/"))
+			const newPathAvailable = newFile === null
+			return {
+				newPathAvailable,
+				...entry
+			}
+		})
+
+		const tableHeading = "| Current path| Current name | Safe name | Rename possible |\n|---|---|---|---|"
+		const tableRows = checkedFiles.map(entry => {
+			const renamePossible = entry.newPathAvailable ? "Yes" : `No, already exists: [[${this.getSafePath(entry.file, entry.safeName)}]]`;
+			return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} | ${renamePossible} |`
 		})
 		const report = `${filesToRename.length} files should be renamed to be sync-safe:\n\n${tableHeading}\n${tableRows.join("\n")}`;
 
