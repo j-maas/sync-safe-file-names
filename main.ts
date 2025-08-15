@@ -1,81 +1,95 @@
-import { App, Editor, MarkdownView, Modal, Notice, Plugin, PluginSettingTab, Setting } from 'obsidian';
+import { App, Editor, Notice, Plugin, PluginSettingTab, Setting, TAbstractFile, TFile } from 'obsidian';
+import { failure, Result, success } from 'src/result';
+import { getSafeName } from 'src/safe-name';
 
 // Remember to rename these classes and interfaces!
 
-interface MyPluginSettings {
-	mySetting: string;
+interface SyncSafeSettings {
+	renameAutomatically: boolean;
+	addOriginalAlias: boolean;
+	logPath?: string;
 }
 
-const DEFAULT_SETTINGS: MyPluginSettings = {
-	mySetting: 'default'
+const DEFAULT_SETTINGS: SyncSafeSettings = {
+	renameAutomatically: false,
+	addOriginalAlias: true,
 }
 
-export default class MyPlugin extends Plugin {
-	settings: MyPluginSettings;
+export default class SyncSafePlugin extends Plugin {
+	settings: SyncSafeSettings;
 
 	async onload() {
 		await this.loadSettings();
 
-		// This creates an icon in the left ribbon.
-		const ribbonIconEl = this.addRibbonIcon('dice', 'Sample Plugin', (evt: MouseEvent) => {
-			// Called when the user clicks the icon.
-			new Notice('This is a notice!');
-		});
-		// Perform additional things with the ribbon
-		ribbonIconEl.addClass('my-plugin-ribbon-class');
-
-		// This adds a status bar item to the bottom of the app. Does not work on mobile apps.
-		const statusBarItemEl = this.addStatusBarItem();
-		statusBarItemEl.setText('Status Bar Text');
-
-		// This adds a simple command that can be triggered anywhere
 		this.addCommand({
-			id: 'open-sample-modal-simple',
-			name: 'Open sample modal (simple)',
+			id: 'rename-all-sync-safe',
+			name: 'Rename all files to be sync-safe',
 			callback: () => {
-				new SampleModal(this.app).open();
+				this.renameAllFiles();
 			}
 		});
-		// This adds an editor command that can perform some operation on the current editor instance
-		this.addCommand({
-			id: 'sample-editor-command',
-			name: 'Sample editor command',
-			editorCallback: (editor: Editor, view: MarkdownView) => {
-				console.log(editor.getSelection());
-				editor.replaceSelection('Sample Editor Command');
-			}
-		});
-		// This adds a complex command that can check whether the current state of the app allows execution of the command
-		this.addCommand({
-			id: 'open-sample-modal-complex',
-			name: 'Open sample modal (complex)',
-			checkCallback: (checking: boolean) => {
-				// Conditions to check
-				const markdownView = this.app.workspace.getActiveViewOfType(MarkdownView);
-				if (markdownView) {
-					// If checking is true, we're simply "checking" if the command can be run.
-					// If checking is false, then we want to actually perform the operation.
-					if (!checking) {
-						new SampleModal(this.app).open();
-					}
 
-					// This command will only show up in Command Palette when the check function returns true
-					return true;
+		this.addCommand({
+			id: 'report-all',
+			name: 'Insert report of all unsafe file names',
+			editorCallback: (editor) => {
+				this.generateReport(editor);
+			}
+		});
+
+		this.addCommand({
+			id: 'rename-single-sync-safe',
+			name: 'Rename current file to be sync-safe',
+			editorCheckCallback: (checking, _, view) => {
+				if (checking) {
+					return view.file !== null;
+				} else if (view.file !== null) {
+					console.debug("Renaming current file.")
+					this.renameSingleFile(view.file).then(result => {
+						if (result.success) {
+							console.debug(result.data)
+							if (result.data.alreadySafe) {
+								new Notice(`File name was already sync-safe.`)
+							} else {
+								new Notice(`Renamed file to be sync-safe.`)
+							}
+						} else {
+							if (result.error.code === "alreadyExists") {
+								new Notice(`Could not rename file to "${result.error.data.safeName}" because that file already exists.`)
+							} else {
+								new Notice(`Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`)
+							}
+						}
+					})
+				} else {
+					new Notice(`Could not find an active file to rename.`)
 				}
 			}
 		});
 
-		// This adds a settings tab so the user can configure various aspects of the plugin
-		this.addSettingTab(new SampleSettingTab(this.app, this));
+		this.addSettingTab(new SyncSafeSettingTab(this.app, this));
 
-		// If the plugin hooks up any global DOM events (on parts of the app that doesn't belong to this plugin)
-		// Using this function will automatically remove the event listener when this plugin is disabled.
-		this.registerDomEvent(document, 'click', (evt: MouseEvent) => {
-			console.log('click', evt);
+		if (this.settings.renameAutomatically) {
+			this.registerAutomaticRenaming();
+		}
+	}
+
+	registerAutomaticRenaming() {
+		console.debug("Activating automatic renaming.")
+
+		this.registerEvent(this.app.vault.on('rename', this.onRename, this));
+
+		// Obsidian fires the `create` event for every file on startup. Therefore, we should only register after the layout is ready, according to https://docs.obsidian.md/Plugins/Guides/Optimizing+plugin+load+time#Option+B.+Register+the+handler+once+the+layout+is+ready.
+		this.app.workspace.onLayoutReady(() => {
+			this.registerEvent(this.app.vault.on('create', this.onCreate, this));
 		});
+	}
 
-		// When registering intervals, this function will automatically clear the interval when the plugin is disabled.
-		this.registerInterval(window.setInterval(() => console.log('setInterval'), 5 * 60 * 1000));
+	unregisterAutomaticRenaming() {
+		console.debug("Deactivating automatic renaming.")
+
+		this.app.vault.off('rename', this.onRename)
+		this.app.vault.off('create', this.onCreate)
 	}
 
 	onunload() {
@@ -87,48 +101,186 @@ export default class MyPlugin extends Plugin {
 	}
 
 	async saveSettings() {
+		if (this.settings.renameAutomatically) {
+			this.registerAutomaticRenaming();
+		} else {
+			this.unregisterAutomaticRenaming();
+		}
+
 		await this.saveData(this.settings);
 	}
+
+	async onRename(file: TAbstractFile) {
+		await this.renameSingleFileSilently(file)
+	}
+
+	onCreate(file: TAbstractFile) {
+		setTimeout(async () => {
+			this.renameSingleFileSilently(file)
+		}, 100)
+	}
+
+	async renameSingleFileSilently(file: TAbstractFile) {
+		const result = await this.renameSingleFile(file)
+		if (result.success) {
+			if (!result.data.alreadySafe) {
+				new Notice(`Renamed file to make it sync-safe.`)
+			}
+		} else {
+			if (result.error.code === "alreadyExists") {
+				new Notice(`Sync-safe: Could not rename to "${result.error.data.safeName}" because that file already exists.`)
+			} else {
+				new Notice(`Sync-safe: Could not rename to "${result.error.data.safeName}" because of an error: ${result.error.message}`)
+			}
+		}
+	}
+
+	async generateReport(editor: Editor) {
+		const filesToRename = await this.getFilesToRename()
+		filesToRename.sort((left, right) => left.file.path.localeCompare(right.file.path))
+
+		const tableHeading = "| Current name | Safe name | Current path |\n|---|---|---|"
+		const tableRows = filesToRename.map(entry => {
+			return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} |`
+		})
+		const report = `${filesToRename.length} files should be renamed to be sync-safe:\n\n${tableHeading}\n${tableRows.join("\n")}`;
+
+		editor.replaceRange(report, editor.getCursor())
+	}
+
+	async getFilesToRename(): Promise<{ isAlreadySafe: boolean; safeName: string; file: TFile; }[]> {
+		const allFiles = this.app.vault.getFiles();
+		return allFiles.map(file => {
+			const safeName = this.getSafeNameFromFile(file)
+			const isAlreadySafe = file.name === safeName
+			return {
+				isAlreadySafe,
+				safeName,
+				file
+			}
+		}).filter(entry => !entry.isAlreadySafe);
+	}
+
+	async renameAllFiles() {
+		const filesToRename = await this.getFilesToRename()
+		const results = await Promise.all(filesToRename.map(async (entry) => {
+			const newPath = this.getSafePath(entry.file, entry.safeName)
+			return this.moveFile(entry.file, newPath)
+		}))
+
+		let successes = 0;
+		let failures = 0;
+		results.forEach(result => {
+			if (result.success) {
+				successes += 1;
+			} else {
+				failures += 1;
+			}
+		})
+
+		if (failures === 0) {
+			new Notice(`Successfully renamed ${successes} file(s).`)
+		} else {
+			new Notice(`Failed to rename ${failures} file(s). Successfully renamed ${successes} file(s).`)
+		}
+	}
+
+	async renameSingleFile(file: TAbstractFile): Promise<Result<RenameResult, "alreadyExists" | "unspecified">> {
+		const previousName = file.name
+		const safeName = this.getSafeNameFromFile(file)
+
+		if (previousName === safeName) {
+			return success({ alreadySafe: true, previousName })
+		} else {
+			const newPath = this.getSafePath(file, safeName)
+
+			const result = await this.moveFile(file, newPath)
+			if (result.success) {
+				return success({ alreadySafe: false, previousName, safeName })
+			} else if (result.error.code === "alreadyExists") {
+				return failure("alreadyExists", { data: { safeName } })
+			} else {
+				return failure("unspecified", { message: result.error.message })
+			}
+		}
+	}
+
+	getSafeNameFromFile(file: TAbstractFile): string {
+		const previousName = file.name;
+		return getSafeName(previousName);
+	}
+
+	getSafePath(file: TAbstractFile, safeName: string): string[] {
+		const newPath = file.parent?.path.split("/").filter(part => part.length !== 0) || []
+		newPath.push(safeName);
+
+		return newPath
+	}
+
+	async moveFile(file: TAbstractFile, newPath: string[]): Promise<Result<boolean, "alreadyExists">> {
+		try {
+			await this.app.fileManager.renameFile(file, newPath.join("/"))
+			return success(true)
+		} catch (e) {
+			if (e instanceof Error) {
+				return failure("alreadyExists", { message: e.message })
+			} else {
+				throw e;
+			}
+		}
+	}
 }
 
-class SampleModal extends Modal {
-	constructor(app: App) {
-		super(app);
-	}
-
-	onOpen() {
-		const {contentEl} = this;
-		contentEl.setText('Woah!');
-	}
-
-	onClose() {
-		const {contentEl} = this;
-		contentEl.empty();
-	}
+type RenameResult = {
+	alreadySafe: boolean;
+	previousName: string;
+	newName?: string;
 }
 
-class SampleSettingTab extends PluginSettingTab {
-	plugin: MyPlugin;
+class SyncSafeSettingTab extends PluginSettingTab {
+	plugin: SyncSafePlugin;
 
-	constructor(app: App, plugin: MyPlugin) {
+	constructor(app: App, plugin: SyncSafePlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}
 
 	display(): void {
-		const {containerEl} = this;
+		const { containerEl } = this;
 
 		containerEl.empty();
 
 		new Setting(containerEl)
-			.setName('Setting #1')
-			.setDesc('It\'s a secret')
-			.addText(text => text
-				.setPlaceholder('Enter your secret')
-				.setValue(this.plugin.settings.mySetting)
+			.setName('Rename automatically')
+			.setDesc('If active, all new files will be renamed automatically.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.renameAutomatically)
 				.onChange(async (value) => {
-					this.plugin.settings.mySetting = value;
+					this.plugin.settings.renameAutomatically = value;
 					await this.plugin.saveSettings();
-				}));
+				})
+			);
+
+		new Setting(containerEl)
+			.setName('Keep original name as alias')
+			.setDesc('When a file name is rewritten, the original file name is added as an alias so that it can still be used to link to the file.')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.addOriginalAlias)
+				.onChange(async (value) => {
+					this.plugin.settings.addOriginalAlias = value;
+					await this.plugin.saveSettings();
+				})
+			)
+
+		new Setting(containerEl)
+			.setName('Log path')
+			.setDesc('If a path is entered, logs will be written there.')
+			.addText(text => text
+				.setValue(this.plugin.settings.logPath || "")
+				.onChange(async (value) => {
+					this.plugin.settings.logPath = value;
+					await this.plugin.saveSettings();
+				})
+			);
 	}
 }
