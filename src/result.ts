@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 export type Result<data, error> = Success<data> | Failure<error>
 
 export function success<data, error>(data: data): Result<data, error> {
