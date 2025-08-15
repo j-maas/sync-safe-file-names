@@ -10,7 +10,7 @@ This plugin helps you rename all your files to only contain safe characters, by 
 
 ## Getting started
 
-1. Install the plugin.
+1. [Install](https://help.obsidian.md/community-plugins) the plugin.
 2. Automatic renaming is activated by default. You can change this in the plugin settings.
 3. Open a new file, edit the content and run the command "Insert report of all unsafe file names".
 4. If you are happy with the plan, run the command "Rename all files to be sync-safe".
