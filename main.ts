@@ -7,11 +7,10 @@ import { getSafeName } from 'src/safe-name';
 interface SyncSafeSettings {
 	renameAutomatically: boolean;
 	addOriginalAlias: boolean;
-	logPath?: string;
 }
 
 const DEFAULT_SETTINGS: SyncSafeSettings = {
-	renameAutomatically: false,
+	renameAutomatically: true,
 	addOriginalAlias: true,
 }
 
@@ -210,6 +209,9 @@ export default class SyncSafePlugin extends Plugin {
 		} else {
 			const newPath = this.getSafePath(file, safeName)
 
+			if (file instanceof TFile && this.settings.renameAutomatically) {
+				await this.setAlias(file, file.basename)
+			}
 			const result = await this.moveFile(file, newPath)
 			if (result.success) {
 				return success({ alreadySafe: false, previousName, safeName })
@@ -245,6 +247,15 @@ export default class SyncSafePlugin extends Plugin {
 			}
 		}
 	}
+
+	async setAlias(file: TFile, alias: string): Promise<void> {
+		return this.app.fileManager.processFrontMatter(file, frontmatter => {
+			if (frontmatter.aliases === undefined) {
+				frontmatter.aliases = []
+			}
+			frontmatter.aliases.push(alias)
+		})
+	}
 }
 
 type RenameResult = {
@@ -279,7 +290,7 @@ class SyncSafeSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('Keep original name as alias')
-			.setDesc('When a file name is rewritten, the original file name is added as an alias so that it can still be used to link to the file.')
+			.setDesc('When a file name is rewritten, the original file name (without file extension) is added as an alias so that it can still be used to link to the file.')
 			.addToggle(toggle => toggle
 				.setValue(this.plugin.settings.addOriginalAlias)
 				.onChange(async (value) => {
@@ -287,16 +298,5 @@ class SyncSafeSettingTab extends PluginSettingTab {
 					await this.plugin.saveSettings();
 				})
 			)
-
-		new Setting(containerEl)
-			.setName('Log path')
-			.setDesc('If a path is entered, logs will be written there.')
-			.addText(text => text
-				.setValue(this.plugin.settings.logPath || "")
-				.onChange(async (value) => {
-					this.plugin.settings.logPath = value;
-					await this.plugin.saveSettings();
-				})
-			);
 	}
 }
