@@ -21,7 +21,7 @@ interface SyncSafeSettings {
 const DEFAULT_SETTINGS: SyncSafeSettings = {
 	renameAutomatically: true,
 	addOriginalAlias: true,
-	additionalCharacters: "&+'\"(),$€ÄäÖöÜüßÀàÉéÈèÇçÂâÊêËëÏïÎîÔôŒœÆæ",
+	additionalCharacters: "&+'(),$€ÄäÖöÜüßÀàÉéÈèÇçÂâÊêËëÏïÎîÔôŒœÆæ",
 };
 
 export default class SyncSafePlugin extends Plugin {
