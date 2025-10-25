@@ -1,7 +1,7 @@
 {
 	"id": "sync-safe-file-names",
 	"name": "Sync-safe file names",
-	"version": "1.0.2",
+	"version": "1.0.3",
 	"minAppVersion": "0.15.0",
 	"description": "Ensures all file names can be synced accross all platforms.",
 	"author": "j-maas",
