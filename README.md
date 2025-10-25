@@ -8,6 +8,8 @@ Sometimes I have special characters in my file names on my desktop, like `?`. Wh
 
 This plugin helps you rename all your files to only contain safe characters, by replacing all unsafe characters with a hypen, `-`. So "Invalid?.md" becomes "Invalid-.md". The plugin can also automatically rename all new files you create or change the name of, but it will never overwrite an exisiting file.
 
+Other plugins like [Obsidian Filename Linter Plugin](https://github.com/sneakyfoxes/obsidian-safe-filename-linter) require manual execution. This plugin runs automatically to ensure all newly created files have safe names.
+
 ## Getting started
 
 1. [Install](https://help.obsidian.md/community-plugins) the plugin.
