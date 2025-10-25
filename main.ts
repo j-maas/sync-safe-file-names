@@ -345,7 +345,7 @@ class SyncSafeSettingTab extends PluginSettingTab {
 		new Setting(containerEl)
 			.setName("Keep original name as alias")
 			.setDesc(
-				"When a file name is rewritten, the original file name (without file extension) is added as an alias so that it can still be used to link to the file.",
+				"When a file name is rewritten, the original file name (without file extension) is added as an alias so that it can still be used to link to the file. If the file name is already safe, no alias will be added.",
 			)
 			.addToggle((toggle) =>
 				toggle
