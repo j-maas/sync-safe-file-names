@@ -11,7 +11,13 @@ export function getSafeName(
 		"g",
 	);
 
-	let result = rawFileName
+	let result = rawFileName;
+
+	if (forceLowercase) {
+		result = result.toLocaleLowerCase();
+	}
+
+	result = result
 		// Replace dashes with hyphen.
 		.replace(/[–—]/g, "-")
 		// Replace apostrophe with single quote.
@@ -21,10 +27,6 @@ export function getSafeName(
 		// Replace unkown characters.
 		.replace(regexp, "-")
 		.trim();
-
-	if (forceLowercase) {
-		result = result.toLocaleLowerCase();
-	}
 
 	return result;
 }

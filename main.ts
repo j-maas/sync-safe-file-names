@@ -389,6 +389,18 @@ class SyncSafeSettingTab extends PluginSettingTab {
 			);
 
 		new Setting(containerEl)
+			.setName("Lowercase")
+			.setDesc("If active, converts all uppercase letters to lowercase.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.forceLowercase)
+					.onChange(async (value) => {
+						this.plugin.settings.forceLowercase = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
 			.setName("Allowed special characters")
 			.setDesc(
 				`Specify characters that should be allowed in addition to the basics.\nAlways allowed are roman letters, numbers, hyphen, dot, underline and space (/[${baseCharacters}]/).`,
@@ -398,18 +410,6 @@ class SyncSafeSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.additionalCharacters)
 					.onChange(async (value) => {
 						this.plugin.settings.additionalCharacters = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Force lowercase")
-			.setDesc("If active, converts all uppercase letters to lowercase.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.forceLowercase)
-					.onChange(async (value) => {
-						this.plugin.settings.forceLowercase = value;
 						await this.plugin.saveSettings();
 					}),
 			);
