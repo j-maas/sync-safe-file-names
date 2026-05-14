@@ -25,4 +25,28 @@ describe("getSafeName", () => {
 		const result = getSafeName(input, "(Ž");
 		expect(result).toBe("Fancy (exotic- Ž-");
 	});
+
+	test("lowercases ASCII uppercase when forceLowercase is true", () => {
+		const input = "My File Name";
+		const result = getSafeName(input, "", true);
+		expect(result).toBe("my file name");
+	});
+
+	test("lowercases non-ASCII letters that are in additionalCharacters", () => {
+		const input = "Ärger";
+		const result = getSafeName(input, "Ää", true);
+		expect(result).toBe("ärger");
+	});
+
+	test("preserves case when forceLowercase is omitted", () => {
+		const input = "My File Name";
+		const result = getSafeName(input);
+		expect(result).toBe("My File Name");
+	});
+
+	test("forceLowercase still trims and replaces unsafe characters", () => {
+		const input = " Bad?Name ";
+		const result = getSafeName(input, "", true);
+		expect(result).toBe("bad-name");
+	});
 });

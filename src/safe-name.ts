@@ -3,6 +3,7 @@ export const baseCharacters = "-a-zA-Z0-9._ ";
 export function getSafeName(
 	rawFileName: string,
 	additionalCharacters = "",
+	forceLowercase = false,
 ): string {
 	const safeAdditionalCharacters = additionalCharacters.replace(/[[\]]/g, "");
 	const regexp = new RegExp(
@@ -10,16 +11,20 @@ export function getSafeName(
 		"g",
 	);
 
-	return (
-		rawFileName
-			// Replace dashes with hyphen.
-			.replace(/[–—]/g, "-")
-			// Replace apostrophe with single quote.
-			.replace(/’/g, "'")
-			// Replace curled quotes with straight quotes.
-			.replace(/[“”]/g, '"')
-			// Replace unkown characters.
-			.replace(regexp, "-")
-			.trim()
-	);
+	let result = rawFileName
+		// Replace dashes with hyphen.
+		.replace(/[–—]/g, "-")
+		// Replace apostrophe with single quote.
+		.replace(/'/g, "'")
+		// Replace curled quotes with straight quotes.
+		.replace(/[""]/g, '"')
+		// Replace unkown characters.
+		.replace(regexp, "-")
+		.trim();
+
+	if (forceLowercase) {
+		result = result.toLocaleLowerCase();
+	}
+
+	return result;
 }
