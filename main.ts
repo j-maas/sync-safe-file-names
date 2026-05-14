@@ -256,7 +256,7 @@ export default class SyncSafePlugin extends Plugin {
 		} else {
 			const newPath = this.getSafePath(file, safeName);
 
-			if (file instanceof TFile && this.settings.renameAutomatically) {
+			if (file instanceof TFile && this.settings.addOriginalAlias) {
 				await this.setAlias(file, file.basename);
 			}
 			const result = await this.moveFile(file, newPath);
