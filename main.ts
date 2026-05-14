@@ -17,12 +17,14 @@ interface SyncSafeSettings {
 	renameAutomatically: boolean;
 	addOriginalAlias: boolean;
 	additionalCharacters: string;
+	forceLowercase: boolean;
 }
 
 const DEFAULT_SETTINGS: SyncSafeSettings = {
 	renameAutomatically: true,
 	addOriginalAlias: true,
 	additionalCharacters: "&+'(),$€ÄäÖöÜüßÀàÉéÈèÇçÂâÊêËëÏïÎîÔôŒœÆæ",
+	forceLowercase: false,
 };
 
 export default class SyncSafePlugin extends Plugin {
@@ -295,7 +297,11 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	getSafeNameFromFilename(fileName: string): string {
-		return getSafeName(fileName, this.settings.additionalCharacters);
+		return getSafeName(
+			fileName,
+			this.settings.additionalCharacters,
+			this.settings.forceLowercase,
+		);
 	}
 
 	getSafePath(file: TAbstractFile, safeName: string): string[] {
@@ -391,6 +397,18 @@ class SyncSafeSettingTab extends PluginSettingTab {
 					.setValue(this.plugin.settings.additionalCharacters)
 					.onChange(async (value) => {
 						this.plugin.settings.additionalCharacters = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Force lowercase")
+			.setDesc("If active, converts all uppercase letters to lowercase.")
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.forceLowercase)
+					.onChange(async (value) => {
+						this.plugin.settings.forceLowercase = value;
 						await this.plugin.saveSettings();
 					}),
 			);
