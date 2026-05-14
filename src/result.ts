@@ -1,37 +1,31 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+export type Result<Data, Error extends { code: string }> =
+	| Success<Data>
+	| Failure<Error>;
 
-export type Result<data, error> = Success<data> | Failure<error>;
+export type Success<Data> = {
+	success: true;
+	data: Data;
+};
 
-export function success<data, error>(data: data): Result<data, error> {
+export type Failure<Error extends { code: string }> = {
+	success: false;
+	error: Error;
+};
+
+export function success<Data, Error extends { code: string }>(
+	data: Data,
+): Result<Data, Error> {
 	return {
 		success: true,
 		data,
 	};
 }
 
-export type Success<data> = {
-	success: true;
-	data: data;
-};
-
-export function failure<data, error>(
-	error: error,
-	options: { message?: string; data?: any },
-): Result<data, error> {
+export function failure<Data, Error extends { code: string }>(
+	error: Error,
+): Result<Data, Error> {
 	return {
 		success: false,
-		error: {
-			code: error,
-			...options,
-		},
+		error,
 	};
 }
-
-export type Failure<error> = {
-	success: false;
-	error: {
-		code: error;
-		message?: string;
-		data?: any;
-	};
-};

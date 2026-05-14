@@ -39,7 +39,7 @@ export default class SyncSafePlugin extends Plugin {
 			id: "rename-all-sync-safe",
 			name: "Rename all files to be sync-safe",
 			callback: () => {
-				this.renameAllFiles();
+				this.renameAllFiles().catch(console.error);
 			},
 		});
 
@@ -47,7 +47,7 @@ export default class SyncSafePlugin extends Plugin {
 			id: "report-all",
 			name: "Insert report of all unsafe file names",
 			editorCallback: (editor) => {
-				this.generateReport(editor);
+				this.generateReport(editor).catch(console.error);
 			},
 		});
 
@@ -58,25 +58,29 @@ export default class SyncSafePlugin extends Plugin {
 				if (checking) {
 					return view.file !== null;
 				} else if (view.file !== null) {
-					this.renameSingleFile(view.file).then((result) => {
-						if (result.success) {
-							if (result.data.alreadySafe) {
-								new Notice(`File name was already sync-safe.`);
+					this.renameSingleFile(view.file)
+						.then((result) => {
+							if (result.success) {
+								if (result.data.alreadySafe) {
+									new Notice(
+										`File name was already sync-safe.`,
+									);
+								} else {
+									new Notice(`Renamed file to be sync-safe.`);
+								}
 							} else {
-								new Notice(`Renamed file to be sync-safe.`);
+								if (result.error.code === "alreadyExists") {
+									new Notice(
+										`Could not rename file to "${result.error.data.safeName}" because that file already exists.`,
+									);
+								} else {
+									new Notice(
+										`Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
+									);
+								}
 							}
-						} else {
-							if (result.error.code === "alreadyExists") {
-								new Notice(
-									`Could not rename file to "${result.error.data.safeName}" because that file already exists.`,
-								);
-							} else {
-								new Notice(
-									`Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
-								);
-							}
-						}
-					});
+						})
+						.catch(console.error);
 				} else {
 					new Notice(`Could not find an active file to rename.`);
 				}
@@ -94,8 +98,16 @@ export default class SyncSafePlugin extends Plugin {
 		// Obsidian fires the `create` event for every file on startup. Therefore, we should only register after the layout is ready, according to https://docs.obsidian.md/Plugins/Guides/Optimizing+plugin+load+time#Option+B.+Register+the+handler+once+the+layout+is+ready.
 		this.app.workspace.onLayoutReady(() => {
 			const callbacks = [
-				this.app.vault.on("create", this.onCreate, this),
-				this.app.vault.on("rename", this.onRename, this),
+				this.app.vault.on(
+					"create",
+					(file) => this.onCreate(file),
+					this,
+				),
+				this.app.vault.on(
+					"rename",
+					(file) => this.onRename(file),
+					this,
+				),
 			];
 			callbacks.forEach((callback) => this.registerEvent(callback));
 			this.automaticRenameCallbacks = callbacks;
@@ -115,7 +127,7 @@ export default class SyncSafePlugin extends Plugin {
 		this.settings = Object.assign(
 			{},
 			DEFAULT_SETTINGS,
-			await this.loadData(),
+			(await this.loadData()) as SyncSafeSettings,
 		);
 	}
 
@@ -140,8 +152,8 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	onCreate(file: TAbstractFile) {
-		setTimeout(async () => {
-			this.renameSingleFileSilently(file);
+		window.setTimeout(() => {
+			this.renameSingleFileSilently(file).catch(console.error);
 		}, 100);
 	}
 
@@ -195,7 +207,7 @@ export default class SyncSafePlugin extends Plugin {
 		const tableRows = checkedFiles.map((entry) => {
 			const renamePossible = entry.newPathAvailable
 				? "Yes"
-				: `No, already exists: [[${this.getSafePath(entry.file, entry.safeName)}]]`;
+				: `No, already exists: [[${this.getSafePath(entry.file, entry.safeName).join("/")}]]`;
 			return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} | ${renamePossible} |`;
 		});
 		const report = `${filesToRename.length} files should be renamed to be sync-safe:\n\n${tableHeading}\n${tableRows.join("\n")}`;
@@ -250,7 +262,7 @@ export default class SyncSafePlugin extends Plugin {
 
 	async renameSingleFile(
 		file: TAbstractFile,
-	): Promise<Result<RenameResult, "alreadyExists" | "unspecified">> {
+	): Promise<Result<RenameResult, RenameError>> {
 		const { previousName, safeName } =
 			this.extractNamesFromAbstractFile(file);
 
@@ -266,9 +278,15 @@ export default class SyncSafePlugin extends Plugin {
 			if (result.success) {
 				return success({ alreadySafe: false, previousName, safeName });
 			} else if (result.error.code === "alreadyExists") {
-				return failure("alreadyExists", { data: { safeName } });
+				return failure({
+					code: "alreadyExists",
+					data: { safeName },
+					message: result.error.message,
+				});
 			} else {
-				return failure("unspecified", {
+				return failure({
+					code: "unspecified",
+					data: { safeName },
 					message: result.error.message,
 				});
 			}
@@ -317,13 +335,13 @@ export default class SyncSafePlugin extends Plugin {
 	async moveFile(
 		file: TAbstractFile,
 		newPath: string[],
-	): Promise<Result<boolean, "alreadyExists">> {
+	): Promise<Result<boolean, MoveFileError>> {
 		try {
 			await this.app.fileManager.renameFile(file, newPath.join("/"));
 			return success(true);
 		} catch (e) {
 			if (e instanceof Error) {
-				return failure("alreadyExists", { message: e.message });
+				return failure({ code: "alreadyExists", message: e.message });
 			} else {
 				throw e;
 			}
@@ -331,15 +349,18 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	async setAlias(file: TFile, alias: string): Promise<void> {
-		return this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			if (!Array.isArray(frontmatter.aliases)) {
-				frontmatter.aliases = [];
-			}
-			// Prevent duplicate aliases
-			else if (!frontmatter.aliases.includes(alias)) {
-				frontmatter.aliases.push(alias);
-			}
-		});
+		return this.app.fileManager.processFrontMatter(
+			file,
+			(frontmatter: { aliases?: unknown }) => {
+				if (!Array.isArray(frontmatter.aliases)) {
+					frontmatter.aliases = [];
+				}
+				// Prevent duplicate aliases
+				else if (!frontmatter.aliases.includes(alias)) {
+					frontmatter.aliases.push(alias);
+				}
+			},
+		);
 	}
 }
 
@@ -348,6 +369,12 @@ type RenameResult = {
 	previousName: string;
 	newName?: string;
 };
+
+type MoveFileError = { code: "alreadyExists"; message?: string };
+
+type RenameError =
+	| { code: "alreadyExists"; data: { safeName: string }; message?: string }
+	| { code: "unspecified"; data: { safeName: string }; message?: string };
 
 class SyncSafeSettingTab extends PluginSettingTab {
 	plugin: SyncSafePlugin;
