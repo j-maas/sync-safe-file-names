@@ -33,6 +33,7 @@ export default class SyncSafePlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+		this.automaticRenameCallbacks = [];
 
 		this.addCommand({
 			id: "rename-all-sync-safe",
