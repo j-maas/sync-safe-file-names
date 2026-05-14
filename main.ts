@@ -325,10 +325,13 @@ export default class SyncSafePlugin extends Plugin {
 
 	async setAlias(file: TFile, alias: string): Promise<void> {
 		return this.app.fileManager.processFrontMatter(file, (frontmatter) => {
-			if (frontmatter.aliases === undefined) {
+			if (!Array.isArray(frontmatter.aliases)) {
 				frontmatter.aliases = [];
 			}
-			frontmatter.aliases.push(alias);
+			// Prevent duplicate aliases
+			else if (!frontmatter.aliases.includes(alias)) {
+				frontmatter.aliases.push(alias);
+			}
 		});
 	}
 }
