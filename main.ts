@@ -8,6 +8,7 @@ import {
 	Setting,
 	TAbstractFile,
 	TFile,
+	TFolder,
 } from "obsidian";
 import { failure, Result, success } from "src/result";
 import { baseCharacters, getSafeName } from "src/safe-name";
@@ -205,7 +206,7 @@ export default class SyncSafePlugin extends Plugin {
 		const allFiles = this.app.vault.getFiles();
 		return allFiles
 			.map((file) => {
-				const safeName = this.getSafeNameFromFile(file);
+				const safeName = this.getSafeNameFromFilename(file.name);
 				const isAlreadySafe = file.name === safeName;
 				return {
 					isAlreadySafe,
@@ -247,8 +248,8 @@ export default class SyncSafePlugin extends Plugin {
 	async renameSingleFile(
 		file: TAbstractFile,
 	): Promise<Result<RenameResult, "alreadyExists" | "unspecified">> {
-		const previousName = file.name;
-		const safeName = this.getSafeNameFromFile(file);
+		const { previousName, safeName } =
+			this.extractNamesFromAbstractFile(file);
 
 		if (previousName === safeName) {
 			return success({ alreadySafe: true, previousName });
@@ -271,9 +272,30 @@ export default class SyncSafePlugin extends Plugin {
 		}
 	}
 
-	getSafeNameFromFile(file: TAbstractFile): string {
-		const previousName = file.name;
-		return getSafeName(previousName, this.settings.additionalCharacters);
+	extractNamesFromAbstractFile(file: TAbstractFile): {
+		previousName: string;
+		safeName: string;
+	} {
+		let previousName, safeName;
+
+		if (file instanceof TFolder) {
+			previousName = file.name;
+			safeName = this.getSafeNameFromFilename(file.name);
+		} else if (file instanceof TFile) {
+			previousName = file.name;
+			const safeBaseName = this.getSafeNameFromFilename(file.basename);
+			safeName = `${safeBaseName}.${file.extension}`;
+		} else {
+			throw new Error(
+				"Unknown file type. File is neither folder nor file.",
+			);
+		}
+
+		return { previousName, safeName };
+	}
+
+	getSafeNameFromFilename(fileName: string): string {
+		return getSafeName(fileName, this.settings.additionalCharacters);
 	}
 
 	getSafePath(file: TAbstractFile, safeName: string): string[] {
