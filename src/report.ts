@@ -31,6 +31,15 @@ export async function getRenameReport(
 		};
 	});
 
+	const conflictCount = checkedFiles.filter(
+		(file) => file.conflictingPath !== undefined,
+	).length;
+
+	let summary = `${filesToRename.length} files should be renamed to be sync-safe:`;
+	if (conflictCount > 0) {
+		summary = `${filesToRename.length} files should be renamed to be sync-safe (${conflictCount} cannot be renamed due to an existing file):`;
+	}
+
 	const tableHeading =
 		"| Current path| Current name | Safe name | Rename possible |\n|---|---|---|---|";
 	const tableRows = checkedFiles.map((entry) => {
@@ -40,7 +49,8 @@ export async function getRenameReport(
 				: `No, already exists: [[${entry.conflictingPath?.toRelativeString()}]]`;
 		return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} | ${renamePossible} |`;
 	});
-	return `${filesToRename.length} files should be renamed to be sync-safe:\n\n${tableHeading}\n${tableRows.join("\n")}`;
+
+	return `${summary}\n\n${tableHeading}\n${tableRows.join("\n")}`;
 }
 
 export async function getFilesToRename(
