@@ -65,25 +65,7 @@ export default class SyncSafePlugin extends Plugin {
 				} else if (view.file !== null) {
 					this.renameSingleFile(view.file)
 						.then((result) => {
-							if (result.success) {
-								if (result.data.alreadySafe) {
-									new Notice(
-										`File name was already sync-safe.`,
-									);
-								} else {
-									new Notice(`Renamed file to be sync-safe.`);
-								}
-							} else {
-								if (result.error.code === "alreadyExists") {
-									new Notice(
-										`Could not rename file to "${result.error.data.safeName}" because that file already exists.`,
-									);
-								} else {
-									new Notice(
-										`Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
-									);
-								}
-							}
+							this.giveNoticeAboutResult(result);
 						})
 						.catch(console.error);
 				} else {
@@ -166,18 +148,36 @@ export default class SyncSafePlugin extends Plugin {
 
 	async renameSingleFileSilently(file: TAbstractFile) {
 		const result = await this.renameSingleFile(file);
+		this.giveNoticeAboutResult(result, false);
+	}
+
+	giveNoticeAboutResult(
+		result: Result<RenameResult, RenameError>,
+		noticeWhenAlreadySafe = true,
+	) {
 		if (result.success) {
+			if (result.data.alreadySafe && noticeWhenAlreadySafe) {
+				new Notice(`File name was already sync-safe.`);
+				return;
+			}
+
 			if (!result.data.alreadySafe) {
-				new Notice(`Renamed file to make it sync-safe.`);
+				if (result.data.aliasError === undefined) {
+					new Notice(`Renamed file to be sync-safe.`);
+				} else {
+					new Notice(
+						`Renamed file to be sync-safe, but could not safely update aliases: Instead of a list it is a ${result.data.aliasError.data.type} containing '${result.data.aliasError.data.content}'.`,
+					);
+				}
 			}
 		} else {
 			if (result.error.code === "alreadyExists") {
 				new Notice(
-					`Sync-safe: Could not rename to "${result.error.data.safeName}" because that file already exists.`,
+					`Sync-safe: Could not rename file to "${result.error.data.safeName}" because that file already exists.`,
 				);
 			} else {
 				new Notice(
-					`Sync-safe: Could not rename to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
+					`Sync-safe: Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
 				);
 			}
 		}
@@ -278,12 +278,21 @@ export default class SyncSafePlugin extends Plugin {
 		} else {
 			const newPath = this.getSafePath(file, safeName);
 
+			let aliasError: InsertAliasError | undefined;
 			if (file instanceof TFile && this.settings.addOriginalAlias) {
-				await this.setAlias(file, file.basename);
+				const result = await this.setAlias(file, file.basename);
+				if (!result.success) {
+					aliasError = result.error;
+				}
 			}
 			const result = await this.moveFile(file, newPath);
 			if (result.success) {
-				return success({ alreadySafe: false, previousName, safeName });
+				return success({
+					alreadySafe: false,
+					aliasError,
+					previousName,
+					safeName,
+				});
 			} else if (result.error.code === "alreadyExists") {
 				return failure({
 					code: "alreadyExists",
@@ -375,6 +384,7 @@ export default class SyncSafePlugin extends Plugin {
 
 type RenameResult = {
 	alreadySafe: boolean;
+	aliasError?: InsertAliasError;
 	previousName: string;
 	newName?: string;
 };
