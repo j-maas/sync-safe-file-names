@@ -17,6 +17,8 @@ import {
 	getSafeName,
 	InsertAliasError,
 } from "./safe-name";
+import { getFilesToRename, getRenameReport } from "./report";
+import { Path } from "./path";
 
 interface SyncSafeSettings {
 	renameAutomatically: boolean;
@@ -184,66 +186,26 @@ export default class SyncSafePlugin extends Plugin {
 	}
 
 	async generateReport(editor: Editor) {
-		const filesToRename = await this.getFilesToRename();
-
-		if (filesToRename.length === 0) {
-			editor.replaceRange(
-				"All files are already sync-safe.",
-				editor.getCursor(),
-			);
-			return;
-		}
-
-		filesToRename.sort((left, right) =>
-			left.file.path.localeCompare(right.file.path),
+		const allFiles = this.app.vault.getFiles();
+		const report = await getRenameReport(
+			allFiles,
+			this.settings.additionalCharacters,
+			this.settings.forceLowercase,
 		);
-		const checkedFiles = filesToRename.map((entry) => {
-			const newPath = this.getSafePath(entry.file, entry.safeName);
-			const newFile = this.app.vault.getAbstractFileByPath(
-				newPath.join("/"),
-			);
-			const newPathAvailable = newFile === null;
-			return {
-				newPathAvailable,
-				...entry,
-			};
-		});
-
-		const tableHeading =
-			"| Current path| Current name | Safe name | Rename possible |\n|---|---|---|---|";
-		const tableRows = checkedFiles.map((entry) => {
-			const renamePossible = entry.newPathAvailable
-				? "Yes"
-				: `No, already exists: [[${this.getSafePath(entry.file, entry.safeName).join("/")}]]`;
-			return `| [[${entry.file.path}]] | ${entry.file.name} | ${entry.safeName} | ${renamePossible} |`;
-		});
-		const report = `${filesToRename.length} files should be renamed to be sync-safe:\n\n${tableHeading}\n${tableRows.join("\n")}`;
 
 		editor.replaceRange(report, editor.getCursor());
 	}
 
-	async getFilesToRename(): Promise<
-		{ isAlreadySafe: boolean; safeName: string; file: TFile }[]
-	> {
-		const allFiles = this.app.vault.getFiles();
-		return allFiles
-			.map((file) => {
-				const safeName = this.getSafeNameFromFilename(file.name);
-				const isAlreadySafe = file.name === safeName;
-				return {
-					isAlreadySafe,
-					safeName,
-					file,
-				};
-			})
-			.filter((entry) => !entry.isAlreadySafe);
-	}
-
 	async renameAllFiles() {
-		const filesToRename = await this.getFilesToRename();
+		const allFiles = this.app.vault.getFiles();
+		const filesToRename = await getFilesToRename(
+			allFiles,
+			this.settings.additionalCharacters,
+			this.settings.forceLowercase,
+		);
 		const results = await Promise.all(
 			filesToRename.map(async (entry) => {
-				const newPath = this.getSafePath(entry.file, entry.safeName);
+				const newPath = Path.forRenamedFile(entry.file, entry.safeName);
 				return this.moveFile(entry.file, newPath);
 			}),
 		);
@@ -276,7 +238,7 @@ export default class SyncSafePlugin extends Plugin {
 		if (previousName === safeName) {
 			return success({ alreadySafe: true, previousName });
 		} else {
-			const newPath = this.getSafePath(file, safeName);
+			const newPath = Path.forRenamedFile(file, safeName);
 
 			let aliasError: InsertAliasError | undefined;
 			if (file instanceof TFile && this.settings.addOriginalAlias) {
@@ -314,7 +276,11 @@ export default class SyncSafePlugin extends Plugin {
 		safeName: string;
 	} {
 		const previousName = file.name;
-		const safeName = this.getSafeNameFromFilename(file.name);
+		const safeName = getSafeName(
+			file.name,
+			this.settings.additionalCharacters,
+			this.settings.forceLowercase,
+		);
 
 		if (!(file instanceof TFolder) && !(file instanceof TFile)) {
 			throw new Error(
@@ -325,29 +291,15 @@ export default class SyncSafePlugin extends Plugin {
 		return { previousName, safeName };
 	}
 
-	getSafeNameFromFilename(fileName: string): string {
-		return getSafeName(
-			fileName,
-			this.settings.additionalCharacters,
-			this.settings.forceLowercase,
-		);
-	}
-
-	getSafePath(file: TAbstractFile, safeName: string): string[] {
-		const newPath =
-			file.parent?.path.split("/").filter((part) => part.length !== 0) ||
-			[];
-		newPath.push(safeName);
-
-		return newPath;
-	}
-
 	async moveFile(
 		file: TAbstractFile,
-		newPath: string[],
+		newPath: Path,
 	): Promise<Result<boolean, MoveFileError>> {
 		try {
-			await this.app.fileManager.renameFile(file, newPath.join("/"));
+			await this.app.fileManager.renameFile(
+				file,
+				newPath.toRelativeString(),
+			);
 			return success(true);
 		} catch (e) {
 			if (e instanceof Error) {
