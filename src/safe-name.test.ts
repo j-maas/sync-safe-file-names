@@ -4,27 +4,33 @@ import { failure, success } from "./result";
 
 describe("getSafeName", () => {
 	test("returns safe name unchanged", () => {
-		const input = "This is a valid filename";
+		const input = "This is a valid filename.md";
 		const result = getSafeName(input);
 		expect(result).toBe(input);
 	});
 
 	test("replaces unsafe characters", () => {
-		const input = "This is not valid?";
+		const input = "This is not valid?.md";
 		const result = getSafeName(input);
-		expect(result).toBe("This is not valid-");
+		expect(result).toBe("This is not valid-.md");
+	});
+
+	test("sanitizes file name without file extension", () => {
+		const input = "This has no file extension?";
+		const result = getSafeName(input);
+		expect(result).toBe("This has no file extension-");
 	});
 
 	test("trims outer whitespace", () => {
-		const input = " There is whitespace";
+		const input = " There is whitespace.md";
 		const result = getSafeName(input);
-		expect(result).toBe("There is whitespace");
+		expect(result).toBe("There is whitespace.md");
 	});
 
 	test("allows additional characters", () => {
-		const input = "Fancy (exotic) Ž?";
+		const input = "Fancy (exotic) Ž?.md";
 		const result = getSafeName(input, "(Ž");
-		expect(result).toBe("Fancy (exotic- Ž-");
+		expect(result).toBe("Fancy (exotic- Ž-.md");
 	});
 
 	describe("lowercase", () => {

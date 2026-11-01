@@ -302,16 +302,10 @@ export default class SyncSafePlugin extends Plugin {
 		previousName: string;
 		safeName: string;
 	} {
-		let previousName, safeName;
+		const previousName = file.name;
+		const safeName = this.getSafeNameFromFilename(file.name);
 
-		if (file instanceof TFolder) {
-			previousName = file.name;
-			safeName = this.getSafeNameFromFilename(file.name);
-		} else if (file instanceof TFile) {
-			previousName = file.name;
-			const safeBaseName = this.getSafeNameFromFilename(file.basename);
-			safeName = `${safeBaseName}.${file.extension}`;
-		} else {
+		if (!(file instanceof TFolder) && !(file instanceof TFile)) {
 			throw new Error(
 				"Unknown file type. File is neither folder nor file.",
 			);
