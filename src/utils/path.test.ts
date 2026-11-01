@@ -20,6 +20,26 @@ describe("Path", () => {
 		expect(path.toRelativeString()).toBe("just/one");
 	});
 
+	describe(".equals()", () => {
+		test("detects equal siblings", () => {
+			const path1 = Path.fromString("same");
+			const path2 = Path.fromString("same");
+			expect(path1.equals(path2)).toBe(true);
+		});
+
+		test("distinguishes different sibling", () => {
+			const path1 = Path.fromString("first");
+			const path2 = Path.fromString("second");
+			expect(path1.equals(path2)).toBe(false);
+		});
+
+		test("distinguishes same file in different folders", () => {
+			const path1 = Path.fromString("first/same");
+			const path2 = Path.fromString("second/same");
+			expect(path1.equals(path2)).toBe(false);
+		});
+	});
+
 	describe(".parent()", () => {
 		test("returns the parent path", () => {
 			const input = "folder/file";

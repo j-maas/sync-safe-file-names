@@ -3,6 +3,10 @@ import { TAbstractFile } from "obsidian";
 export class Path {
 	private constructor(private segments: string[]) {}
 
+	equals(other: Path): boolean {
+		return this.toRelativeString() === other.toRelativeString();
+	}
+
 	static fromFile(file: TAbstractFile): Path {
 		return Path.fromString(file.path);
 	}

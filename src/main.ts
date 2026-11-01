@@ -2,9 +2,11 @@ import {
 	App,
 	Editor,
 	EventRef,
+	Modal,
 	Notice,
 	Plugin,
 	PluginSettingTab,
+	Setting,
 	SettingDefinitionItem,
 	TAbstractFile,
 	TFile,
@@ -17,7 +19,7 @@ import {
 	getSafeName,
 	InsertAliasError,
 } from "./safe-name";
-import { getFilesToRename, getRenameReport } from "./report";
+import { FileRenameInfo, getFilesToRename, getRenameReport } from "./report";
 import { Path } from "./utils/path";
 
 interface SyncSafeSettings {
@@ -34,6 +36,9 @@ const DEFAULT_SETTINGS: SyncSafeSettings = {
 	forceLowercase: false,
 };
 
+const renameAllCommandName = "Rename all files to be sync-safe";
+const reportCommandName = "Insert report of all unsafe file names";
+
 export default class SyncSafePlugin extends Plugin {
 	settings: SyncSafeSettings;
 	automaticRenameCallbacks: EventRef[];
@@ -44,15 +49,15 @@ export default class SyncSafePlugin extends Plugin {
 
 		this.addCommand({
 			id: "rename-all-sync-safe",
-			name: "Rename all files to be sync-safe",
+			name: renameAllCommandName,
 			callback: () => {
-				this.renameAllFiles().catch(console.error);
+				this.triggerRenamingAllFiles().catch(console.error);
 			},
 		});
 
 		this.addCommand({
 			id: "report-all",
-			name: "Insert report of all unsafe file names",
+			name: reportCommandName,
 			editorCallback: (editor) => {
 				this.generateReport(editor).catch(console.error);
 			},
@@ -196,13 +201,32 @@ export default class SyncSafePlugin extends Plugin {
 		editor.replaceRange(report, editor.getCursor());
 	}
 
-	async renameAllFiles() {
+	async triggerRenamingAllFiles() {
 		const allFiles = this.app.vault.getFiles();
-		const filesToRename = await getFilesToRename(
+		const { filesToRename, conflictingFiles } = await getFilesToRename(
 			allFiles,
 			this.settings.additionalCharacters,
 			this.settings.forceLowercase,
 		);
+
+		if (filesToRename.length === 0) {
+			shortNotice(`All file names are already sync-safe.`);
+			return;
+		}
+
+		const conflictCount = conflictingFiles.length;
+
+		new ConfirmRenameAllModal(
+			this.app,
+			filesToRename.length,
+			conflictCount,
+			() => {
+				this.renameAllFiles(filesToRename).catch(console.error);
+			},
+		).open();
+	}
+
+	async renameAllFiles(filesToRename: FileRenameInfo[]) {
 		const results = await Promise.all(
 			filesToRename.map(async (entry) => {
 				const newPath = Path.forRenamedFile(entry.file, entry.safeName);
@@ -390,6 +414,55 @@ class SyncSafeSettingTab extends PluginSettingTab {
 				control: { type: "textarea", key: "additionalCharacters" },
 			},
 		];
+	}
+}
+
+class ConfirmRenameAllModal extends Modal {
+	constructor(
+		app: App,
+		private readonly renameCount: number,
+		private readonly confliceCount: number,
+		private readonly onConfirm: () => void,
+	) {
+		super(app);
+	}
+
+	onOpen() {
+		this.setTitle("Rename all files to be sync-safe?");
+
+		const fileCountDisplay =
+			this.renameCount === 1 ? "1 file" : `${this.renameCount} files`;
+		let countInfo = `This will rename ${fileCountDisplay} in your vault so that their names are sync-safe.`;
+
+		if (this.confliceCount > 0) {
+			const conflictCountDisplay =
+				this.confliceCount === 1
+					? "1 file"
+					: `${this.confliceCount} files`;
+			countInfo += ` ${conflictCountDisplay} will be skipped, because their names conflict with existing files.`;
+		}
+
+		this.contentEl.createEl("p", {
+			text: countInfo,
+		});
+		this.contentEl.createEl("p", {
+			text: `This cannot be undone. Consider making a backup of your vault first. To preview the affected files, open a new note and run the command '${reportCommandName}' in it.`,
+		});
+
+		new Setting(this.contentEl)
+			.addButton((button) =>
+				button.setButtonText("Cancel").onClick(() => this.close()),
+			)
+			.addButton((button) =>
+				button
+					.setButtonText("Rename all")
+					.setDestructive()
+					.setCta()
+					.onClick(() => {
+						this.onConfirm();
+						this.close();
+					}),
+			);
 	}
 }
 

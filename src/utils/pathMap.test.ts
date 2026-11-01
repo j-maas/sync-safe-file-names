@@ -8,7 +8,10 @@ describe("PathMap", () => {
 			Path.fromString(path),
 		);
 		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.isPathAvailable(Path.fromString("file3"));
+		const result = pathMap.isRenameAvailable({
+			currentPath: Path.fromString("file3?"),
+			newPath: Path.fromString("file3-"),
+		});
 		expect(result).toBe(true);
 	});
 
@@ -17,7 +20,10 @@ describe("PathMap", () => {
 			Path.fromString(path),
 		);
 		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.isPathAvailable(Path.fromString("folder/file3"));
+		const result = pathMap.isRenameAvailable({
+			currentPath: Path.fromString("folder/file3?"),
+			newPath: Path.fromString("folder/file3-"),
+		});
 		expect(result).toBe(true);
 	});
 
@@ -26,34 +32,58 @@ describe("PathMap", () => {
 			Path.fromString(path),
 		);
 		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.isPathAvailable(
-			Path.fromString("folder3/file3"),
-		);
+		const result = pathMap.isRenameAvailable({
+			currentPath: Path.fromString("folder1/file3?"),
+			newPath: Path.fromString("folder3/file3-"),
+		});
 		expect(result).toBe(true);
 	});
 
 	test("a path that matches an existing is not avaiable", () => {
-		const allFilePaths = ["existing"].map((path) => Path.fromString(path));
-		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.getConflictingPath(Path.fromString("existing"));
-		expect(result).toStrictEqual(Path.fromString("existing"));
-	});
-
-	test("a path that uses different letter casing to an existing is conflicting", () => {
-		const allFilePaths = ["EXISTING"].map((path) => Path.fromString(path));
-		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.getConflictingPath(Path.fromString("existing"));
-		expect(result).toStrictEqual(Path.fromString("EXISTING"));
-	});
-
-	test("a path that conflicts in a different folder is available", () => {
-		const allFilePaths = ["existing", "folder/different"].map((path) =>
+		const allFilePaths = ["existing-", "other"].map((path) =>
 			Path.fromString(path),
 		);
 		const pathMap = PathMap.fromPaths(allFilePaths);
-		const result = pathMap.isPathAvailable(
-			Path.fromString("folder/existing"),
+		const result = pathMap.getRenameConflictPath({
+			currentPath: Path.fromString("existing?"),
+			newPath: Path.fromString("existing-"),
+		});
+		expect(result).toStrictEqual(Path.fromString("existing-"));
+	});
+
+	test("a path that uses different letter casing to an existing is conflicting", () => {
+		const allFilePaths = ["EXISTING-", "other"].map((path) =>
+			Path.fromString(path),
 		);
+		const pathMap = PathMap.fromPaths(allFilePaths);
+		const result = pathMap.getRenameConflictPath({
+			currentPath: Path.fromString("existing?"),
+			newPath: Path.fromString("existing-"),
+		});
+		expect(result).toStrictEqual(Path.fromString("EXISTING-"));
+	});
+
+	test("a path that conflicts in a different folder is available", () => {
+		const allFilePaths = ["existing-", "folder/different"].map((path) =>
+			Path.fromString(path),
+		);
+		const pathMap = PathMap.fromPaths(allFilePaths);
+		const result = pathMap.isRenameAvailable({
+			currentPath: Path.fromString("folder/existing?"),
+			newPath: Path.fromString("folder/existing-"),
+		});
+		expect(result).toBe(true);
+	});
+
+	test("renaming the checked path is available", () => {
+		const currentPath = Path.fromString("LOWERCASE_ME");
+		const allFilePaths = [currentPath];
+
+		const pathMap = PathMap.fromPaths(allFilePaths);
+		const result = pathMap.isRenameAvailable({
+			currentPath,
+			newPath: Path.fromString("lowercase_me"),
+		});
 		expect(result).toBe(true);
 	});
 });

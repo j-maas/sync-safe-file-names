@@ -46,15 +46,26 @@ export class PathMap {
 		this.map.set(folder, existingFiles);
 	}
 
-	isPathAvailable(newPath: Path): boolean {
-		return this.getConflictingPath(newPath) === undefined;
+	/**
+	 * @param newPath The path to check for availability.
+	 * @param currentPath The path the file currently occupies. This allows us to detect renames and prevent false conflicts.
+	 * @returns true if newPath is available, otherwise false.
+	 */
+	isRenameAvailable(paths: { currentPath: Path; newPath: Path }): boolean {
+		return this.getRenameConflictPath(paths) === undefined;
 	}
 
 	/**
 	 * @param newPath The path to check for availability.
+	 * @param currentPath The path the file currently occupies. This allows us to detect renames and prevent false conflicts.
 	 * @returns `undefined` if newPath is available, otherwise a Path to the conflicting file.
 	 */
-	getConflictingPath(newPath: Path): Path | undefined {
+	getRenameConflictPath(paths: {
+		currentPath: Path;
+		newPath: Path;
+	}): Path | undefined {
+		const { newPath, currentPath } = paths;
+
 		const folder = newPath.parent().toRelativeString();
 		const file = newPath.lastSegment().toLocaleLowerCase();
 
@@ -64,6 +75,8 @@ export class PathMap {
 		}
 		const potentialConflict = existingFiles.get(file);
 		if (potentialConflict === undefined) {
+			return undefined;
+		} else if (potentialConflict.equals(currentPath)) {
 			return undefined;
 		} else {
 			return potentialConflict;
