@@ -5,7 +5,7 @@ import {
 	Notice,
 	Plugin,
 	PluginSettingTab,
-	Setting,
+	SettingDefinitionItem,
 	TAbstractFile,
 	TFile,
 	TFolder,
@@ -126,17 +126,7 @@ export default class SyncSafePlugin extends Plugin {
 		this.automaticRenameCallbacks = [];
 	}
 
-	onunload() {}
-
-	async loadSettings() {
-		this.settings = Object.assign(
-			{},
-			DEFAULT_SETTINGS,
-			(await this.loadData()) as SyncSafeSettings,
-		);
-	}
-
-	async saveSettings() {
+	updateRenameCallbacks() {
 		if (
 			this.settings.renameAutomatically &&
 			this.automaticRenameCallbacks.length === 0
@@ -148,7 +138,19 @@ export default class SyncSafePlugin extends Plugin {
 		) {
 			this.unregisterAutomaticRenaming();
 		}
+	}
 
+	onunload() {}
+
+	async loadSettings() {
+		this.settings = Object.assign(
+			{},
+			DEFAULT_SETTINGS,
+			(await this.loadData()) as SyncSafeSettings,
+		);
+	}
+
+	async saveSettings() {
 		await this.saveData(this.settings);
 	}
 
@@ -391,61 +393,40 @@ class SyncSafeSettingTab extends PluginSettingTab {
 		this.plugin = plugin;
 	}
 
-	display(): void {
-		const { containerEl } = this;
+	getSettingDefinitions(): SettingDefinitionItem<keyof SyncSafeSettings>[] {
+		return [
+			{
+				name: "Rename automatically",
+				desc: "If active, all new files will be renamed automatically.",
+				render: (setting) => {
+					setting.addToggle((toggle) =>
+						toggle
+							.setValue(this.plugin.settings.renameAutomatically)
+							.onChange(async (value) => {
+								this.plugin.settings.renameAutomatically =
+									value;
+								await this.plugin.saveSettings();
 
-		containerEl.empty();
-
-		new Setting(containerEl)
-			.setName("Rename automatically")
-			.setDesc("If active, all new files will be renamed automatically.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.renameAutomatically)
-					.onChange(async (value) => {
-						this.plugin.settings.renameAutomatically = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Keep original name as alias")
-			.setDesc(
-				"When a file name is rewritten, the original file name (without file extension) is added as an alias so that it can still be used to link to the file. If the file name is already safe, no alias will be added.",
-			)
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.addOriginalAlias)
-					.onChange(async (value) => {
-						this.plugin.settings.addOriginalAlias = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Lowercase")
-			.setDesc("If active, converts all uppercase letters to lowercase.")
-			.addToggle((toggle) =>
-				toggle
-					.setValue(this.plugin.settings.forceLowercase)
-					.onChange(async (value) => {
-						this.plugin.settings.forceLowercase = value;
-						await this.plugin.saveSettings();
-					}),
-			);
-
-		new Setting(containerEl)
-			.setName("Allowed special characters")
-			.setDesc(
-				`Specify characters that should be allowed in addition to the basics.\nAlways allowed are roman letters, numbers, hyphen, dot, underline and space (/[${baseCharacters}]/).`,
-			)
-			.addTextArea((text) =>
-				text
-					.setValue(this.plugin.settings.additionalCharacters)
-					.onChange(async (value) => {
-						this.plugin.settings.additionalCharacters = value;
-						await this.plugin.saveSettings();
-					}),
-			);
+								this.plugin.updateRenameCallbacks();
+							}),
+					);
+				},
+			},
+			{
+				name: "Keep original name as alias",
+				desc: "When a file name is rewritten, the original file name (without file extension) is added as an alias so that it can still be used to link to the file. If the file name is already safe, no alias will be added.",
+				control: { type: "toggle", key: "addOriginalAlias" },
+			},
+			{
+				name: "Lowercase",
+				desc: "If active, converts all uppercase letters to lowercase.",
+				control: { type: "toggle", key: "forceLowercase" },
+			},
+			{
+				name: "Allowed special characters",
+				desc: `Specify characters that should be allowed in addition to the basics.\nAlways allowed are roman letters, numbers, hyphen, dot, underline and space (/[${baseCharacters}]/).`,
+				control: { type: "textarea", key: "additionalCharacters" },
+			},
+		];
 	}
 }
