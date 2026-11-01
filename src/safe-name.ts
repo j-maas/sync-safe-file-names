@@ -44,7 +44,10 @@ export function getNewAliases(
 
 	if (Array.isArray(existingAliases)) {
 		resultingAliases = structuredClone(existingAliases);
-	} else if (typeof existingAliases === "undefined") {
+	} else if (
+		typeof existingAliases === "undefined" ||
+		existingAliases === null
+	) {
 		resultingAliases = [];
 	} else {
 		return failure({

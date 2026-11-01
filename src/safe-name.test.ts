@@ -93,6 +93,14 @@ describe("insertAliasInFrontmatter", () => {
 		expect(result).toStrictEqual(success([newAlias]));
 	});
 
+	test("when aliases is null, it creates an array with new alias", () => {
+		const newAlias = "insertMe";
+		const existingAliases = null;
+		const result = getNewAliases(existingAliases, newAlias);
+
+		expect(result).toStrictEqual(success([newAlias]));
+	});
+
 	test("aborts when aliases is not an array", () => {
 		const newAlias = "insertMe";
 		const existingAliases = "just a string, not an array";
