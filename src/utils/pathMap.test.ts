@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { PathMap } from "./report";
 import { Path } from "./path";
+import { PathMap } from "./pathMap";
 
 describe("PathMap", () => {
 	test("a free path in the root folder is available", () => {

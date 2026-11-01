@@ -10,7 +10,7 @@ import {
 	TFile,
 	TFolder,
 } from "obsidian";
-import { failure, Result, success } from "./result";
+import { failure, Result, success } from "./utils/result";
 import {
 	baseCharacters,
 	getNewAliases,
@@ -18,7 +18,7 @@ import {
 	InsertAliasError,
 } from "./safe-name";
 import { getFilesToRename, getRenameReport } from "./report";
-import { Path } from "./path";
+import { Path } from "./utils/path";
 
 interface SyncSafeSettings {
 	renameAutomatically: boolean;

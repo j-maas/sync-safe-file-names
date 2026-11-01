@@ -1,4 +1,4 @@
-import { failure, Result, success } from "./result";
+import { failure, Result, success } from "./utils/result";
 
 export const baseCharacters = "-a-zA-Z0-9._ ";
 

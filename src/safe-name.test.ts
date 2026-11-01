@@ -1,6 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
 import { getNewAliases, getSafeName } from "./safe-name";
-import { failure, success } from "./result";
+import { failure, success } from "./utils/result";
 
 describe("getSafeName", () => {
 	test("returns safe name unchanged", () => {
