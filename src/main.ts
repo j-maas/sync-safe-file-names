@@ -10,8 +10,8 @@ import {
 	TFile,
 	TFolder,
 } from "obsidian";
-import { failure, Result, success } from "src/result";
-import { baseCharacters, getSafeName } from "src/safe-name";
+import { failure, Result, success } from "./result";
+import { baseCharacters, getSafeName } from "./safe-name";
 
 interface SyncSafeSettings {
 	renameAutomatically: boolean;
