@@ -157,26 +157,26 @@ export default class SyncSafePlugin extends Plugin {
 	) {
 		if (result.success) {
 			if (result.data.alreadySafe && noticeWhenAlreadySafe) {
-				new Notice(`File name was already sync-safe.`);
+				shortNotice(`File name was already sync-safe.`);
 				return;
 			}
 
 			if (!result.data.alreadySafe) {
 				if (result.data.aliasError === undefined) {
-					new Notice(`Renamed file to be sync-safe.`);
+					shortNotice(`Renamed file to be sync-safe.`);
 				} else {
-					new Notice(
+					longNotice(
 						`Renamed file to be sync-safe, but could not safely update aliases: Instead of a list it is a ${result.data.aliasError.data.type} containing '${result.data.aliasError.data.content}'.`,
 					);
 				}
 			}
 		} else {
 			if (result.error.code === "alreadyExists") {
-				new Notice(
+				longNotice(
 					`Sync-safe: Could not rename file to "${result.error.data.safeName}" because that file already exists.`,
 				);
 			} else {
-				new Notice(
+				longNotice(
 					`Sync-safe: Could not rename file to "${result.error.data.safeName}" because of an error: ${result.error.message}`,
 				);
 			}
@@ -259,9 +259,9 @@ export default class SyncSafePlugin extends Plugin {
 		});
 
 		if (failures === 0) {
-			new Notice(`Successfully renamed ${successes} file(s).`);
+			shortNotice(`Successfully renamed ${successes} file(s).`);
 		} else {
-			new Notice(
+			longNotice(
 				`Failed to rename ${failures} file(s). Successfully renamed ${successes} file(s).`,
 			);
 		}
@@ -439,4 +439,12 @@ class SyncSafeSettingTab extends PluginSettingTab {
 			},
 		];
 	}
+}
+
+function shortNotice(message: string) {
+	new Notice(message, 5000);
+}
+
+function longNotice(message: string) {
+	new Notice(message, 10_000);
 }
