@@ -1,5 +1,6 @@
 import { describe, expect, test } from "@jest/globals";
-import { getSafeName } from "./safe-name";
+import { getNewAliases, getSafeName } from "./safe-name";
+import { failure, success } from "./result";
 
 describe("getSafeName", () => {
 	test("returns safe name unchanged", () => {
@@ -50,5 +51,55 @@ describe("getSafeName", () => {
 			const result = getSafeName(input, "", true);
 			expect(result).toBe("bad-name");
 		});
+	});
+});
+
+describe("insertAliasInFrontmatter", () => {
+	test("adds new alias to existing aliases", () => {
+		const newAlias = "insertMe";
+		const existingAliases = ["existingAlias"];
+		const result = getNewAliases(existingAliases, newAlias);
+
+		expect(result).toStrictEqual(success(["existingAlias", newAlias]));
+	});
+
+	test("does not add alias redundantly if already present", () => {
+		const newAlias = "alreadyExists";
+		const existingAliases = ["alreadyExists"];
+		const result = getNewAliases(existingAliases, newAlias);
+
+		expect(result).toStrictEqual(success(["alreadyExists"]));
+	});
+
+	test("does not mutate the original array", () => {
+		const newAlias = "insertMe";
+		const existingAliases = ["existingAlias"];
+		getNewAliases(existingAliases, newAlias);
+
+		expect(existingAliases).toStrictEqual(["existingAlias"]);
+	});
+
+	test("when aliases is missing, it creates an array with new alias", () => {
+		const newAlias = "insertMe";
+		const existingAliases = undefined;
+		const result = getNewAliases(existingAliases, newAlias);
+
+		expect(result).toStrictEqual(success([newAlias]));
+	});
+
+	test("aborts when aliases is not an array", () => {
+		const newAlias = "insertMe";
+		const existingAliases = "just a string, not an array";
+		const result = getNewAliases(existingAliases, newAlias);
+
+		expect(result).toStrictEqual(
+			failure({
+				code: "not-array",
+				data: {
+					type: "string",
+					content: '"just a string, not an array"',
+				},
+			}),
+		);
 	});
 });

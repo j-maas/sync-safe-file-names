@@ -11,7 +11,12 @@ import {
 	TFolder,
 } from "obsidian";
 import { failure, Result, success } from "./result";
-import { baseCharacters, getSafeName } from "./safe-name";
+import {
+	baseCharacters,
+	getNewAliases,
+	getSafeName,
+	InsertAliasError,
+} from "./safe-name";
 
 interface SyncSafeSettings {
 	renameAutomatically: boolean;
@@ -348,19 +353,27 @@ export default class SyncSafePlugin extends Plugin {
 		}
 	}
 
-	async setAlias(file: TFile, alias: string): Promise<void> {
-		return this.app.fileManager.processFrontMatter(
+	async setAlias(
+		file: TFile,
+		newAlias: string,
+	): Promise<Result<void, InsertAliasError>> {
+		let error: InsertAliasError | undefined;
+		await this.app.fileManager.processFrontMatter(
 			file,
 			(frontmatter: { aliases?: unknown }) => {
-				if (!Array.isArray(frontmatter.aliases)) {
-					frontmatter.aliases = [];
-				}
-				// Prevent duplicate aliases
-				else if (!frontmatter.aliases.includes(alias)) {
-					frontmatter.aliases.push(alias);
+				const result = getNewAliases(frontmatter.aliases, newAlias);
+				if (result.success) {
+					frontmatter.aliases = result.data;
+				} else {
+					error = result.error;
 				}
 			},
 		);
+		if (error === undefined) {
+			return success(undefined);
+		} else {
+			return failure(error);
+		}
 	}
 }
 

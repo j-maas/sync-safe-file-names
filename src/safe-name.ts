@@ -1,3 +1,5 @@
+import { failure, Result, success } from "./result";
+
 export const baseCharacters = "-a-zA-Z0-9._ ";
 
 export function getSafeName(
@@ -30,3 +32,40 @@ export function getSafeName(
 
 	return result;
 }
+
+/**
+ * Mutates the frontmatter.
+ */
+export function getNewAliases(
+	existingAliases: unknown,
+	newAlias: string,
+): Result<string[], InsertAliasError> {
+	let resultingAliases = [];
+
+	if (Array.isArray(existingAliases)) {
+		resultingAliases = structuredClone(existingAliases);
+	} else if (typeof existingAliases === "undefined") {
+		resultingAliases = [];
+	} else {
+		return failure({
+			code: "not-array",
+			data: {
+				type: typeof existingAliases,
+				// JSON.stringify can throw an exception when its input contains circular references or is a BigInt. I assume that those cannot happen in a frontmatter field.
+				content: JSON.stringify(existingAliases),
+			},
+		});
+	}
+
+	// Prevent duplicate aliases
+	if (!resultingAliases.includes(newAlias)) {
+		resultingAliases.push(newAlias);
+	}
+
+	return success(resultingAliases);
+}
+
+export type InsertAliasError = {
+	code: "not-array";
+	data: { type: string; content: string };
+};
